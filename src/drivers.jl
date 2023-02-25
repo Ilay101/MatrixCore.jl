@@ -1,7 +1,7 @@
 using ZMQ
 using ProtoBuf
 
-include("./proto/matrix_io.jl")
+include("./gen/matrix_io/matrix_io.jl")
 
 """
     Base type for Matrix Core drivers
@@ -226,6 +226,35 @@ function decodedata(::T, ::AbstractString) where {T<:Driver}
     error("abstract method")
 end
 
+function readproto(io::IOBuffer, t::T) where {T}
+    d=ProtoDecoder(io)
+    decode(d, t)
+end
+
+function writeproto(io::IOBuffer, m)
+    e=ProtoEncoder(io)
+    encode(e, m)
+end
+
+function make_driver(delay=2, timeout=6)
+    matrix_io.malos.v1.driver.DriverConfig(
+        delay,
+        timeout,
+        nothing, # image
+        nothing, # malos_eye_config
+        nothing, # zigbee_message
+        nothing, # lirc
+        nothing, # servo
+        nothing, # gpio
+        nothing, # humidity
+        nothing, # micarray
+        nothing, # zwave
+        nothing, # wakeword
+        nothing, # matrix_device
+        "" # uuid
+    )
+end
+
 """
     HumidityDriver <: Driver
 
@@ -238,10 +267,10 @@ struct HumidityDriver <: Driver
     errsocket::Socket
     keepalivesocket::Socket
     datasocket::Socket
-    datachannel::Channel{ProtoType}
+    datachannel::Channel
     errchannel::Channel
     function HumidityDriver(h)
-        d=new(20017, h, Socket(PUSH), Socket(SUB), Socket(PUSH), Socket(SUB), Channel{ProtoType}(typemax(Int)), Channel(Inf))
+        d=new(20017, h, Socket(PUSH), Socket(SUB), Socket(PUSH), Socket(SUB), Channel(typemax(Int)), Channel(Inf))
         connect(d.configsocket, "tcp://$(d.host):$(d.baseport)")
         d
     end
@@ -249,9 +278,20 @@ end
 
 function configure(d::HumidityDriver; delay=2, timeout= 6, temp=21)
     config = matrix_io.malos.v1.driver.DriverConfig(
-        delay_between_updates=delay,
-        timeout_after_last_ping=timeout,
-        humidity=matrix_io.malos.v1.sense.HumidityParams(current_temperature=temp)
+        delay,
+        timeout,
+        nothing, # image
+        nothing, # malos_eye_config
+        nothing, # zigbee_message
+        nothing, # lirc
+        nothing, # servo
+        nothing, # gpio
+        matrix_io.malos.v1.sense.HumidityParams(temp), # humidity
+        nothing, # micarray
+        nothing, # zwave
+        nothing, # wakeword
+        nothing, # matrix_device
+        "" # uuid
     )
     io = IOBuffer()
     writeproto(io, config)
@@ -261,7 +301,7 @@ end
 
 function decodedata(d::HumidityDriver, buffer::AbstractString)
     io = IOBuffer(buffer)
-    readproto(io, matrix_io.malos.v1.sense.Humidity())
+    readproto(io, matrix_io.malos.v1.sense.Humidity)
 end
 
 """
@@ -276,29 +316,26 @@ struct IMUDriver <: Driver
     errsocket::Socket
     keepalivesocket::Socket
     datasocket::Socket
-    datachannel::Channel{ProtoType}
+    datachannel::Channel
     errchannel::Channel
     function IMUDriver(h)
-        d=new(20013, h, Socket(PUSH), Socket(SUB), Socket(PUSH), Socket(SUB), Channel{ProtoType}(typemax(Int)), Channel(Inf))
+        d=new(20013, h, Socket(PUSH), Socket(SUB), Socket(PUSH), Socket(SUB), Channel(typemax(Int)), Channel(Inf))
         connect(d.configsocket, "tcp://$(d.host):$(d.baseport)")
         d
     end
 end
 
 function configure(d::IMUDriver; delay=2, timeout=6)
-    config = matrix_io.malos.v1.driver.DriverConfig(
-        delay_between_updates=delay,
-        timeout_after_last_ping=timeout
-    )
+    config = make_driver(delay, timeout)
     io = IOBuffer()
     writeproto(io, config)
-    m = String(take!(io))
+    msg = String(take!(io))
     send(d.configsocket,msg)
 end
 
 function decodedata(d::IMUDriver, buffer::AbstractString)
     io = IOBuffer(buffer)
-    readproto(io, matrix_io.malos.v1.sense.Imu())
+    readproto(io, matrix_io.malos.v1.sense.Imu)
 end
 
 """
@@ -313,20 +350,17 @@ struct UVDriver <: Driver
     errsocket::Socket
     keepalivesocket::Socket
     datasocket::Socket
-    datachannel::Channel{ProtoType}
+    datachannel::Channel
     errchannel::Channel
     function UVDriver(h)
-        d=new(20029, h, Socket(PUSH), Socket(SUB), Socket(PUSH), Socket(SUB), Channel{ProtoType}(typemax(Int)), Channel(Inf))
+        d=new(20029, h, Socket(PUSH), Socket(SUB), Socket(PUSH), Socket(SUB), Channel(typemax(Int)), Channel(Inf))
         connect(d.configsocket, "tcp://$(d.host):$(d.baseport)")
         d
     end
 end
 
 function configure(d::UVDriver; delay=2, timeout=6)
-    config = matrix_io.malos.v1.driver.DriverConfig(
-        delay_between_updates=delay,
-        timeout_after_last_ping=timeout
-    )
+    config = make_driver(delay, timeout)
     io = IOBuffer()
     writeproto(io, config)
     msg = String(take!(io))
@@ -335,7 +369,7 @@ end
 
 function decodedata(d::UVDriver, buffer::AbstractString)
     io = IOBuffer(buffer)
-    readproto(io, matrix_io.malos.v1.sense.UV())
+    readproto(io, matrix_io.malos.v1.sense.UV)
 end
 
 """
@@ -350,29 +384,26 @@ struct PressureDriver <: Driver
     errsocket::Socket
     keepalivesocket::Socket
     datasocket::Socket
-    datachannel::Channel{ProtoType}
+    datachannel::Channel
     errchannel::Channel
     function PressureDriver(h)
-        d=new(20025, h, Socket(PUSH), Socket(SUB), Socket(PUSH), Socket(SUB), Channel{ProtoType}(typemax(Int)), Channel(Inf))
+        d=new(20025, h, Socket(PUSH), Socket(SUB), Socket(PUSH), Socket(SUB), Channel(typemax(Int)), Channel(Inf))
         connect(d.configsocket, "tcp://$(d.host):$(d.baseport)")
         d
     end
 end
 
 function configure(d::PressureDriver; delay=2, timeout=6)
-    config = matrix_io.malos.v1.driver.DriverConfig(
-        delay_between_updates=delay,
-        timeout_after_last_ping=timeout
-    )
+    config = make_driver(delay, timeout)
     io = IOBuffer()
     writeproto(io, config)
     msg = String(take!(io))
     send(d.configsocket,msg)
 end
 
-function decodedata(d::PressureDriver, buffer::String)
+function decodedata(d::PressureDriver, buffer::AbstractString)
     io = IOBuffer(buffer)
-    readproto(io, matrix_io.malos.v1.sense.Pressure())
+    readproto(io, matrix_io.malos.v1.sense.Pressure)
 end
 
 """
@@ -387,10 +418,10 @@ struct EverloopDriver <: Driver
     errsocket::Socket
     keepalivesocket::Socket
     datasocket::Socket
-    datachannel::Channel{ProtoType}
+    datachannel::Channel
     errchannel::Channel
     function EverloopDriver(h)
-        d=new(20021, h, Socket(PUSH), Socket(SUB), Socket(PUSH), Socket(SUB), Channel{ProtoType}(typemax(Int)), Channel(Inf))
+        d=new(20021, h, Socket(PUSH), Socket(SUB), Socket(PUSH), Socket(SUB), Channel(typemax(Int)), Channel(Inf))
         connect(d.configsocket, "tcp://$(d.host):$(d.baseport)")
         d
     end
@@ -398,7 +429,20 @@ end
 
 function configure(d::EverloopDriver,r::Array{UInt32},g::Array{UInt32},b::Array{UInt32};nbleds=35)
     config = matrix_io.malos.v1.driver.DriverConfig(
-        image=matrix_io.malos.v1.io.EverloopImage()
+        delay,
+        timeout,
+        matrix_io.malos.v1.io.EverloopImage(), # image
+        nothing, # malos_eye_config
+        nothing, # zigbee_message
+        nothing, # lirc
+        nothing, # servo
+        nothing, # gpio
+        nothing, # humidity
+        nothing, # micarray
+        nothing, # zwave
+        nothing, # wakeword
+        nothing, # matrix_device
+        "" # uuid
     )
     nb=min(size(r,1),size(g,1),size(b,1),nbleds)
     config.image.led=Vector{matrix_io.malos.v1.io.LedValue}(undef,nbleds)
@@ -417,7 +461,7 @@ end
 
 function decodedata(d::EverloopDriver, buffer::String)
     io = IOBuffer(buffer)
-    readproto(io, matrix_io.malos.v1.io.EverloopImage())
+    readproto(io, matrix_io.malos.v1.io.EverloopImage)
 end
 
 """
@@ -432,10 +476,10 @@ struct GPIODriver <: Driver
     errsocket::Socket
     keepalivesocket::Socket
     datasocket::Socket
-    datachannel::Channel{ProtoType}
+    datachannel::Channel
     errchannel::Channel
     function GPIODriver(h)
-        d=new(20049, h, Socket(PUSH), Socket(SUB), Socket(PUSH), Socket(SUB), Channel{ProtoType}(typemax(Int)), Channel(Inf))
+        d=new(20049, h, Socket(PUSH), Socket(SUB), Socket(PUSH), Socket(SUB), Channel(typemax(Int)), Channel(Inf))
         connect(d.configsocket, "tcp://$(d.host):$(d.baseport)")
         d
     end
@@ -443,13 +487,20 @@ end
 
 function configure(d::GPIODriver; delay=2, timeout=6, pin=1, isinput=false, value=0)
     config = matrix_io.malos.v1.driver.DriverConfig(
-        delay_between_updates=delay,
-        timeout_after_last_ping=timeout,
-        gpio=matrix_io.malos.v1.io.GpioParams(
-            pin=pin,
-            mode=isinput ? 0 : 1,
-            value=value
-        )
+        delay,
+        timeout,
+        nothing, # image
+        nothing, # malos_eye_config
+        nothing, # zigbee_message
+        nothing, # lirc
+        nothing, # servo
+        matrix_io.malos.v1.io.GpioParams(pin, isinput ? 0 : 1, value), # gpio
+        nothing, # humidity
+        nothing, # micarray
+        nothing, # zwave
+        nothing, # wakeword
+        nothing, # matrix_device
+        "" # uuid
     )
     io = IOBuffer()
     writeproto(io, config)
@@ -459,5 +510,5 @@ end
 
 function decodedata(d::GPIODriver, buffer::String)
     io = IOBuffer(buffer)
-    readproto(io, matrix_io.malos.v1.io.GpioParams())
+    readproto(io, matrix_io.malos.v1.io.GpioParams)
 end

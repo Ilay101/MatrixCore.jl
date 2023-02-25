@@ -30,7 +30,7 @@ Use the code below to connect to the humidity driver and receive data every 2 se
 ```julia
 julia> using MatrixCore
 julia> h=HumidityDriver("raspberry")
-julia> configure(h,2)
+julia> configure(h;delay=2)
 julia> start(h)
 ```
 It is also possible to send data to the Everloop driver
@@ -44,7 +44,7 @@ for i=1:50
   configure(h,red,green,blue)
   sleep(0.1)
 end
-red=zeros(UInt32,35)
-configure(h,red,red,red)
-closedriver(h)
+off=zeros(UInt32,35)
+configure(h,off,off,off)
+close(h)
 ```
