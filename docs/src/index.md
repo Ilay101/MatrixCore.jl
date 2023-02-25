@@ -11,7 +11,7 @@ Currently, only the following drivers are supported
 - GPIO
 
 
-The [Guide](@ref) provides a tutorial explaining how to get started using MatrixCore.jl.
+The [Guide](guide.md) provides a tutorial explaining how to get started using MatrixCore.jl.
 
 
-See the [Reference](@ref) for the complete list of documented functions and types.
+See the [Reference](reference.md) for the complete list of documented functions and types.
